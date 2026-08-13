@@ -112,13 +112,60 @@
   @media (prefers-reduced-motion: no-preference){
     .row-fade{ animation:fadeUp 0.5s ease-out both; }
     .cta-pulse{ animation:ctaPulse 2.2s ease-in-out infinite; }
+    .pulse-dot{ animation:pulseDot 1.8s ease-in-out infinite; }
   }
   @keyframes fadeUp{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:translateY(0); } }
   @keyframes ctaPulse{ 0%,100%{ box-shadow:0 8px 24px -6px rgba(255,106,0,.55), 0 0 0 0 rgba(255,106,0,.35); } 50%{ box-shadow:0 8px 30px -4px rgba(255,106,0,.7), 0 0 0 10px rgba(255,106,0,0); } }
+  @keyframes pulseDot{ 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:.55; transform:scale(1.25); } }
 
   ::selection{ background:var(--orange); color:#fff; }
 
   #search-input:disabled{ opacity:.5; cursor:not-allowed; }
+
+  .step-dot{
+    display:flex; align-items:center; justify-content:center;
+    width:26px; height:26px; border-radius:9999px; flex-shrink:0;
+    font-family:'Russo One',system-ui,sans-serif; font-size:12px;
+    background:var(--card); border:2px solid var(--border); color:var(--muted);
+    transition:background-color .3s ease, border-color .3s ease, color .3s ease;
+  }
+  .step-dot.is-done{ background:var(--orange); border-color:var(--orange); color:#fff; }
+  .step-dot.is-active{ border-color:var(--orange); color:var(--orange-dark); box-shadow:0 0 0 4px rgba(255,106,0,0.15); }
+  .step-line{ width:18px; height:2px; background:var(--border); flex-shrink:0; }
+  .step-line.is-done{ background:var(--orange); }
+  @media (min-width:640px){ .step-line{ width:32px; } }
+
+  .round-table-row td{ vertical-align:middle; }
+
+  /* Move/Step/Perception/Misplaced are the raw input numbers — the original
+     Google Sheet marks their entry cells yellow, so we echo that convention
+     here as a little "input" chip, visually distinct from computed columns. */
+  .metric-chip{
+    display:inline-flex; align-items:center; justify-content:center; min-width:2.1rem;
+    padding:3px 8px; border-radius:7px; font-family:'Russo One',system-ui,sans-serif;
+    font-size:12px; background:#FEF9C3; color:#854D0E; border:1px solid #FDE68A;
+  }
+  .metric-chip.is-empty{ background:transparent; border-color:var(--border); color:var(--muted); font-family:inherit; }
+
+  /* Mức quy đổi badges — one color per tier so the level reads at a glance. */
+  .level-pill{
+    display:inline-flex; align-items:center; padding:2px 9px; border-radius:9999px;
+    font-size:11px; font-weight:600; white-space:nowrap;
+  }
+  .level-outstanding{ background:#EDE9FE; color:#6D28D9; }
+  .level-excellent{ background:#D1FAE5; color:#047857; }
+  .level-verygood{ background:#DBEAFE; color:#1D4ED8; }
+  .level-good{ background:#FEF3C7; color:#B45309; }
+  .level-other{ background:#F1F5F9; color:#475569; }
+
+  .round-spinner{
+    display:inline-block; width:26px; height:26px; border-radius:9999px;
+    border:3px solid var(--border); border-top-color:var(--orange);
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .round-spinner{ animation:spin .8s linear infinite; }
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
 
   .row-hover{ transition:transform .2s ease, background-color .2s ease, border-color .2s ease; }
   .row-hover:hover{ transform:translateX(4px); background-color:#FFF3E6; }
@@ -262,7 +309,100 @@
 <div class="spotlight-glow" id="spotlight-glow" aria-hidden="true"></div>
 
 <div class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
- <div class="show-wrap">
+
+  <!-- Scoreboard phase: 3-round scores pulled live from Google Sheets -->
+  <section id="scoreboard-section" class="pt-8 sm:pt-14">
+    <div class="text-center mb-6 sm:mb-8">
+      <p class="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold tracking-[0.25em] uppercase text-[var(--orange)] mb-2">
+        <span class="w-6 h-px bg-[var(--orange)]"></span>
+        Mùa giải 08 · 2026
+        <span class="w-6 h-px bg-[var(--orange)]"></span>
+      </p>
+      <h1 class="font-bold text-2xl sm:text-4xl leading-tight tracking-tight text-[var(--text)] title-accent">
+        BẢNG ĐIỂM 3 VÒNG <span class="text-[var(--orange)]">TECHXCAMP</span>
+      </h1>
+      <p class="text-[var(--muted)] mt-2 text-xs sm:text-base max-w-xl mx-auto">
+        Dữ liệu điểm thi được cập nhật trực tiếp từ dữ liệu chính thức của ban tổ chức.
+      </p>
+    </div>
+
+    <!-- Step progress: Vòng 1 → Vòng 2 → Vòng 3 → Tổng hợp, one at a time -->
+    <div class="flex items-center justify-center gap-1.5 sm:gap-2 mb-3" id="stepper" aria-hidden="true">
+      <span class="step-dot" data-dot="0">1</span><span class="step-line" data-line="0"></span>
+      <span class="step-dot" data-dot="1">2</span><span class="step-line" data-line="1"></span>
+      <span class="step-dot" data-dot="2">3</span><span class="step-line" data-line="2"></span>
+      <span class="step-dot" data-dot="3">4</span>
+    </div>
+    <div class="flex items-center justify-center gap-3 mb-4">
+      <h2 id="step-label" class="text-center font-bold text-sm sm:text-base text-[var(--orange-dark)] tracking-wide uppercase">Vòng 1</h2>
+      <span class="hidden sm:flex items-center gap-1.5 text-xs font-medium text-[var(--orange-dark)] card-surface rounded-full px-3 py-1.5 shrink-0">
+        <span class="w-2 h-2 rounded-full bg-[var(--orange)] pulse-dot"></span>
+        Live
+      </span>
+      <button id="round-refresh-btn" type="button" aria-label="Tải lại dữ liệu" class="cursor-pointer w-8 h-8 rounded-full card-surface flex items-center justify-center hover:border-[var(--orange)] transition-colors shrink-0">
+        <svg viewBox="0 0 24 24" class="w-3.5 h-3.5 text-[var(--orange)]" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M4 4v5h5M20 20v-5h-5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4.6 15a8 8 0 1 0 1.36-8.36L4 9M20 9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="card-surface rounded-2xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table id="round-table" class="w-full text-xs sm:text-sm min-w-[760px]" style="table-layout:fixed">
+          <colgroup id="round-table-cols">
+            <col style="width:5%"><col style="width:20%"><col style="width:6%">
+            <col style="width:8%"><col style="width:8%"><col style="width:10%">
+            <col style="width:10%"><col style="width:11%"><col style="width:12%"><col style="width:10%">
+          </colgroup>
+          <thead>
+            <tr class="border-b border-[var(--border)] text-[10px] sm:text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">
+              <th class="text-left px-3 sm:px-4 py-2.5 whitespace-nowrap">#</th>
+              <th class="text-left px-3 sm:px-4 py-2.5 whitespace-nowrap">Trường / Nhóm</th>
+              <th class="text-center px-3 sm:px-4 py-2.5 whitespace-nowrap">Đề</th>
+              <th class="text-center px-3 sm:px-4 py-2.5 whitespace-nowrap">Move</th>
+              <th class="text-center px-3 sm:px-4 py-2.5 whitespace-nowrap">Step</th>
+              <th class="text-center px-3 sm:px-4 py-2.5 whitespace-nowrap">Perception</th>
+              <th class="text-center px-3 sm:px-4 py-2.5 whitespace-nowrap">Misplaced</th>
+              <th class="text-center px-3 sm:px-4 py-2.5 whitespace-nowrap">Tổng điểm</th>
+              <th class="text-left px-3 sm:px-4 py-2.5 whitespace-nowrap">Xếp loại</th>
+              <th class="text-left px-3 sm:px-4 py-2.5 whitespace-nowrap">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody id="round-table-body" class="divide-y divide-[var(--border)]"></tbody>
+        </table>
+      </div>
+      <div id="round-loading" class="hidden py-12 text-center text-sm text-[var(--muted)]">
+        <span class="round-spinner"></span>
+        <p class="mt-3">Đang tải dữ liệu từ BTC…</p>
+      </div>
+      <div id="round-error" class="hidden py-10 text-center text-sm">
+        <p class="text-rose-600 font-semibold mb-2">Không tải được dữ liệu.</p>
+        <p class="text-[var(--muted)] mb-3">Kiểm tra kết nối mạng hoặc quyền chia sẻ bởi BTC ("Anyone with the link").</p>
+        <button id="round-retry-btn" type="button" class="cursor-pointer text-xs font-semibold text-white bg-[var(--orange)] px-4 py-2 rounded-full">Thử lại</button>
+      </div>
+    </div>
+
+    <div class="mt-6 sm:mt-8 flex items-center justify-center gap-3">
+      <button id="step-prev-btn" type="button" class="cursor-pointer inline-flex items-center gap-2 font-semibold text-sm text-[var(--orange-dark)] card-surface px-5 sm:px-6 py-3 rounded-full hover:border-[var(--orange)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+        <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Trước đó
+      </button>
+      <button id="step-next-btn" type="button" class="cursor-pointer inline-flex items-center gap-2 font-bold tracking-wide text-sm sm:text-base text-white bg-gradient-to-r from-[var(--orange)] to-[var(--orange-light)] px-6 sm:px-8 py-3 sm:py-3.5 rounded-full">
+        <span id="step-next-label">Tới Vòng 2</span>
+        <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18l6-6-6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button id="proceed-btn" type="button" class="hidden cta-pulse cursor-pointer inline-flex items-center gap-2.5 font-bold tracking-wide text-sm sm:text-base text-white bg-gradient-to-r from-[var(--orange)] to-[var(--orange-light)] px-7 sm:px-9 py-3.5 sm:py-4 rounded-full disabled:opacity-60 disabled:cursor-not-allowed">
+        <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor" aria-hidden="true">
+          <path d="M8 5v14l11-7L8 5Z"/>
+        </svg>
+        <span id="proceed-btn-label">XEM VINH DANH TOP 3</span>
+      </button>
+    </div>
+    <p id="proceed-note" class="text-xs text-[var(--muted)] mt-3 text-center">Chưa xếp hạng — thứ hạng chỉ được tính khi bấm "Xem vinh danh"</p>
+  </section>
+
+ <div class="show-wrap hidden" id="reveal-wrap">
 
   <!-- Hero copy -->
   <section class="text-center">
@@ -316,9 +456,9 @@
           <div class="card-inner flex flex-col items-center">
             <span class="badge w-11 h-11 sm:w-16 sm:h-16 rounded-full flex items-center justify-center font-display text-lg sm:text-2xl text-white shrink-0" style="background:linear-gradient(135deg,#94A3B8,#64748B); box-shadow:0 8px 20px -6px rgba(100,116,139,.5)">2</span>
             <div class="info-block">
-              <p class="font-bold text-base sm:text-xl mt-3 truncate max-w-full">Minh Anh</p>
-              <p class="text-[11px] sm:text-sm text-[var(--muted)] mb-2">@minhanh_tx</p>
-              <p class="font-display text-2xl sm:text-3xl text-[var(--silver)] count-up" data-target="9840">0</p>
+              <p class="team-name font-bold text-base sm:text-xl mt-3 max-w-full leading-snug">—</p>
+              <p class="team-sub text-[11px] sm:text-sm text-[var(--muted)] mb-2">&nbsp;</p>
+              <p class="font-display text-2xl sm:text-3xl text-[var(--silver)] count-up" data-target="0">0</p>
               <p class="text-[10px] sm:text-xs text-[var(--muted)] uppercase tracking-wider">điểm</p>
             </div>
           </div>
@@ -335,9 +475,9 @@
             </svg>
             <span class="badge w-14 h-14 sm:w-20 sm:h-20 rounded-full flex items-center justify-center font-display text-2xl sm:text-4xl text-white shrink-0" style="background:linear-gradient(135deg,var(--orange),#B45309); box-shadow:0 10px 34px -6px rgba(180,83,9,.6)">1</span>
             <div class="info-block">
-              <p class="font-bold text-lg sm:text-2xl mt-3 truncate max-w-full">Quốc Bảo</p>
-              <p class="text-[11px] sm:text-sm text-[var(--muted)] mb-2">@quocbao.dev</p>
-              <p class="font-display text-3xl sm:text-5xl text-[var(--gold)] count-up" data-target="15320">0</p>
+              <p class="team-name font-bold text-lg sm:text-2xl mt-3 max-w-full leading-snug">—</p>
+              <p class="team-sub text-[11px] sm:text-sm text-[var(--muted)] mb-2">&nbsp;</p>
+              <p class="font-display text-3xl sm:text-5xl text-[var(--gold)] count-up" data-target="0">0</p>
               <p class="text-[10px] sm:text-xs text-[var(--muted)] uppercase tracking-wider">điểm</p>
             </div>
           </div>
@@ -351,9 +491,9 @@
           <div class="card-inner flex flex-col items-center">
             <span class="badge w-11 h-11 sm:w-16 sm:h-16 rounded-full flex items-center justify-center font-display text-lg sm:text-2xl text-white shrink-0" style="background:linear-gradient(135deg,#C2703D,#9A5B2E); box-shadow:0 8px 20px -6px rgba(154,91,46,.5)">3</span>
             <div class="info-block">
-              <p class="font-bold text-base sm:text-xl mt-3 truncate max-w-full">Thu Hà</p>
-              <p class="text-[11px] sm:text-sm text-[var(--muted)] mb-2">@thuha.codes</p>
-              <p class="font-display text-2xl sm:text-3xl text-[var(--bronze)] count-up" data-target="8930">0</p>
+              <p class="team-name font-bold text-base sm:text-xl mt-3 max-w-full leading-snug">—</p>
+              <p class="team-sub text-[11px] sm:text-sm text-[var(--muted)] mb-2">&nbsp;</p>
+              <p class="font-display text-2xl sm:text-3xl text-[var(--bronze)] count-up" data-target="0">0</p>
               <p class="text-[10px] sm:text-xs text-[var(--muted)] uppercase tracking-wider">điểm</p>
             </div>
           </div>
@@ -378,7 +518,7 @@
   <section id="list-section" class="hidden mt-10 sm:mt-14">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 px-1">
       <div class="flex items-center justify-between">
-        <h2 class="font-bold text-sm sm:text-base text-[var(--muted)] tracking-wide uppercase">Hạng 4 — 12</h2>
+        <h2 id="list-heading" class="font-bold text-sm sm:text-base text-[var(--muted)] tracking-wide uppercase">Hạng 4 trở xuống</h2>
         <span class="text-xs text-[var(--muted)] sm:hidden" id="result-count-mobile"></span>
       </div>
       <div class="flex items-center gap-3">
@@ -406,19 +546,131 @@
 </div>
 
 <script>
-  const DATA = [
-    {rank:4, name:"Việt Dũng", handle:"@vietdung", score:8210, trend:2},
-    {rank:5, name:"Ngọc Trâm", handle:"@ngoctram", score:7895, trend:-1},
-    {rank:6, name:"Hoàng Phúc", handle:"@hoangphuc", score:7420, trend:0},
-    {rank:7, name:"Bảo Ngọc", handle:"@baongoc", score:6990, trend:3},
-    {rank:8, name:"Đức Anh", handle:"@ducanh", score:6710, trend:-2},
-    {rank:9, name:"Thùy Linh", handle:"@thuylinh", score:6355, trend:1},
-    {rank:10, name:"Gia Huy", handle:"@giahuy", score:5980, trend:0},
-    {rank:11, name:"Kim Chi", handle:"@kimchi", score:5640, trend:-1},
-    {rank:12, name:"Tấn Phát", handle:"@tanphat", score:5210, trend:4},
+  /* ============ Google Sheets live data ============ */
+  /* Public sheet (Anyone with the link can view) — read via the gviz JSONP
+     endpoint so it works from a static page with no backend and no API key.
+     Script-tag injection sidesteps CORS entirely (unlike fetch()/XHR, which
+     Google's endpoint blocks cross-origin). */
+  const SHEET_ID = '1JdEhfVW7ZnoVrbgeYmsFL4ogdA054aAjVPZQep_86RI';
+  const SUMMARY_SHEET = 'tổng hợp';
+  // Linear flow: Vòng 1 → Vòng 2 → Vòng 3 → Tổng hợp, one step at a time —
+  // no jumping around, and no ranking shown until the very end.
+  const STEPS = [
+    { key: 'vòng 1', label: 'Vòng 1', type: 'round' },
+    { key: 'vòng 2', label: 'Vòng 2', type: 'round' },
+    { key: 'vòng 3', label: 'Vòng 3', type: 'round' },
+    { key: SUMMARY_SHEET, label: 'Tổng hợp', type: 'summary' },
   ];
 
-  const REVEAL_NAMES = { 1: "Quốc Bảo", 2: "Minh Anh", 3: "Thu Hà" };
+  function fetchSheetJSONP(sheetName){
+    return new Promise((resolve, reject) => {
+      const cbName = 'gvizCb_' + Math.random().toString(36).slice(2);
+      const script = document.createElement('script');
+      let settled = false;
+      const cleanup = () => { delete window[cbName]; script.remove(); };
+      const timer = setTimeout(() => {
+        if(settled) return;
+        settled = true; cleanup();
+        reject(new Error('Hết thời gian chờ tải dữ liệu.'));
+      }, 12000);
+      window[cbName] = (json) => {
+        if(settled) return;
+        settled = true; clearTimeout(timer); cleanup();
+        if(!json || json.status === 'error') reject(new Error('Dữ liệu trả về lỗi.'));
+        else resolve(json);
+      };
+      script.onerror = () => {
+        if(settled) return;
+        settled = true; clearTimeout(timer); cleanup();
+        reject(new Error('Không kết nối được tới dữ liệu của BTC.'));
+      };
+      script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}`;
+      document.head.appendChild(script);
+    });
+  }
+
+  const cellVal = (c) => (c && c.v !== undefined) ? c.v : null;
+
+  // Round sheet columns: A STT, B Trường/Nhóm, C Đề, D Challenge ID,
+  // E Move, F Step, G Perception, H Misplaced, I Total Cost thực tế, J-K cost math,
+  // L Điểm quy đổi, M Mức quy đổi, N Xếp hạng, O Ghi chú. We deliberately don't read
+  // the score or rank columns here — round view shows raw process metrics only, no ranking.
+  function parseRoundSheet(json){
+    return (json.table.rows || []).map(r => {
+      const c = r.c || [];
+      return {
+        stt: cellVal(c[0]),
+        team: cellVal(c[1]),
+        de: cellVal(c[2]),
+        move: cellVal(c[4]),
+        step: cellVal(c[5]),
+        perception: cellVal(c[6]),
+        misplaced: cellVal(c[7]),
+        totalCost: cellVal(c[8]),
+        level: cellVal(c[12]),
+        note: cellVal(c[14]),
+      };
+    // Rounds sheets have a trailing ΔTC legend block below the real rows —
+    // it has no STT, so requiring one filters it out.
+    }).filter(r => r.stt !== null && r.team);
+  }
+
+  // Summary sheet columns: A STT, B Trường/Nhóm, C-E Vòng1 (Đề/Điểm/ΔTC),
+  // F-H Vòng2, I-K Vòng3, L Số vòng đã chấm, M Tổng điểm, N Điểm TB,
+  // O Tổng ΔTC, P Hạng chung cuộc. finalRank/totalDelta/total are kept for the
+  // ranking computed only when "Xem vinh danh" is pressed — not shown here.
+  function parseSummarySheet(json){
+    return (json.table.rows || []).map(r => {
+      const c = r.c || [];
+      return {
+        stt: cellVal(c[0]),
+        team: cellVal(c[1]),
+        v1: cellVal(c[3]),
+        v2: cellVal(c[6]),
+        v3: cellVal(c[9]),
+        roundsGraded: cellVal(c[11]),
+        total: cellVal(c[12]),
+        avg: cellVal(c[13]),
+        totalDelta: cellVal(c[14]),
+        finalRank: cellVal(c[15]),
+      };
+    }).filter(r => r.stt !== null && r.team);
+  }
+
+  const fmtScore = (n) => (n === null || n === undefined) ? '—' : n.toFixed(1).replace('.', ',');
+  const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (m) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]));
+
+  const metricChip = (v) => v === null ? `<span class="metric-chip is-empty">—</span>` : `<span class="metric-chip">${escapeHtml(v)}</span>`;
+
+  const LEVEL_CLASS = { 'outstanding': 'level-outstanding', 'excellent': 'level-excellent', 'very good': 'level-verygood', 'good': 'level-good' };
+  const levelBadge = (level) => {
+    if(!level) return `<span class="text-[var(--muted)]">—</span>`;
+    const cls = LEVEL_CLASS[String(level).trim().toLowerCase()] || 'level-other';
+    return `<span class="level-pill ${cls}">${escapeHtml(level)}</span>`;
+  };
+
+  // "THPT chuyên Lương Thế Vinh" → "LTV" — drop generic school-name filler
+  // words so the small round-robin badge shows a real abbreviation.
+  const STOPWORDS = new Set(['thpt', 'chuyên', 'trường', 'và', 'thpt.']);
+  function teamInitials(name){
+    const words = String(name || '').trim().split(/\s+/).filter(w => !STOPWORDS.has(w.toLowerCase()));
+    const pick = words.length ? words : String(name || '').trim().split(/\s+/);
+    return pick.slice(-3).map(w => w[0]).join('').toUpperCase() || '?';
+  }
+
+  function rankTeams(list){
+    return [...list].sort((a, b) => {
+      const ra = a.finalRank ?? Infinity, rb = b.finalRank ?? Infinity;
+      if(ra !== rb) return ra - rb;
+      const ta = a.total ?? -Infinity, tb = b.total ?? -Infinity;
+      if(tb !== ta) return tb - ta;
+      const da = a.totalDelta ?? Infinity, db = b.totalDelta ?? Infinity;
+      return da - db;
+    });
+  }
+
+  let DATA = [];
+  let REVEAL_NAMES = { 1: '', 2: '', 3: '' };
 
   const AVATAR_GRADIENTS = [
     "linear-gradient(135deg,#FF8A3D,#FF6A00)",
@@ -428,22 +680,9 @@
     "linear-gradient(135deg,#FB923C,#C2410C)",
   ];
 
-  const initials = (name) => name.trim().split(/\s+/).slice(-2).map(w => w[0]).join('').toUpperCase();
-
-  const trendIcon = (trend) => {
-    if(trend > 0){
-      return `<span class="inline-flex items-center gap-1 text-emerald-600 text-xs font-semibold">
-        <svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 15l6-6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>${trend}</span>`;
-    } else if(trend < 0){
-      return `<span class="inline-flex items-center gap-1 text-rose-600 text-xs font-semibold">
-        <svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>${Math.abs(trend)}</span>`;
-    }
-    return `<span class="inline-flex items-center gap-1 text-[var(--muted)] text-xs font-semibold">
-      <svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14" stroke-linecap="round"/></svg>0</span>`;
-  };
-
   const listEl = document.getElementById('rank-list');
   const listSection = document.getElementById('list-section');
+  const listHeading = document.getElementById('list-heading');
   const emptyEl = document.getElementById('empty-state');
   const countEl = document.getElementById('result-count');
   const countMobileEl = document.getElementById('result-count-mobile');
@@ -452,44 +691,259 @@
     listEl.innerHTML = items.map((m, i) => `
       <div class="row-hover row-fade flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 sm:py-4 cursor-pointer" style="animation-delay:${i * 0.05}s">
         <span class="font-display text-sm sm:text-base w-6 sm:w-8 text-[var(--muted)] text-center shrink-0">${m.rank}</span>
-        <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-display shrink-0" style="background:${AVATAR_GRADIENTS[i % AVATAR_GRADIENTS.length]}">${initials(m.name)}</div>
+        <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-display shrink-0" style="background:${AVATAR_GRADIENTS[i % AVATAR_GRADIENTS.length]}">${teamInitials(m.name)}</div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm sm:text-base font-semibold truncate text-[var(--text)]">${m.name}</p>
-          <p class="text-[11px] sm:text-xs text-[var(--muted)] truncate">${m.handle}</p>
+          <p class="text-sm sm:text-base font-semibold truncate text-[var(--text)]">${escapeHtml(m.name)}</p>
+          <p class="text-[11px] sm:text-xs text-[var(--muted)] truncate">${escapeHtml(m.handle)}</p>
         </div>
-        <div class="hidden sm:block">${trendIcon(m.trend)}</div>
-        <p class="font-display text-sm sm:text-lg text-[var(--orange)] w-16 sm:w-20 text-right shrink-0">${m.score.toLocaleString('vi-VN')}</p>
+        <p class="font-display text-sm sm:text-lg text-[var(--orange)] w-16 sm:w-20 text-right shrink-0">${fmtScore(m.score)}</p>
       </div>
     `).join('');
     emptyEl.classList.toggle('hidden', items.length > 0);
     listEl.classList.toggle('hidden', items.length === 0);
-    countEl.textContent = `${items.length} thành viên`;
-    countMobileEl.textContent = `${items.length} thành viên`;
+    countEl.textContent = `${items.length} đội`;
+    countMobileEl.textContent = `${items.length} đội`;
   }
 
   // search filter
   document.getElementById('search-input').addEventListener('input', (e) => {
     const q = e.target.value.trim().toLowerCase();
-    const filtered = DATA.filter(m => m.name.toLowerCase().includes(q) || m.handle.toLowerCase().includes(q));
+    const filtered = DATA.filter(m => m.name.toLowerCase().includes(q));
     renderList(filtered);
   });
 
   function animateCount(el){
-    const target = parseInt(el.dataset.target, 10);
+    const target = parseFloat(el.dataset.target) || 0;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if(reduceMotion){ el.textContent = target.toLocaleString('vi-VN'); return; }
+    if(reduceMotion){ el.textContent = fmtScore(target); return; }
     let start = null;
     const duration = 1200;
     function step(ts){
       if(!start) start = ts;
       const progress = Math.min((ts - start) / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
-      el.textContent = Math.floor(eased * target).toLocaleString('vi-VN');
+      el.textContent = fmtScore(eased * target);
       if(progress < 1) requestAnimationFrame(step);
-      else el.textContent = target.toLocaleString('vi-VN');
+      else el.textContent = fmtScore(target);
     }
     requestAnimationFrame(step);
   }
+
+  /* ============ Round scoreboard (Google Sheets) ============ */
+  const roundTableBody = document.getElementById('round-table-body');
+  const roundLoadingEl = document.getElementById('round-loading');
+  const roundErrorEl = document.getElementById('round-error');
+  const roundRetryBtn = document.getElementById('round-retry-btn');
+  const roundRefreshBtn = document.getElementById('round-refresh-btn');
+  const proceedBtn = document.getElementById('proceed-btn');
+  const proceedBtnLabel = document.getElementById('proceed-btn-label');
+  const proceedNote = document.getElementById('proceed-note');
+
+  const roundTableEl = document.getElementById('round-table');
+  const roundTableHead = roundTableEl.querySelector('thead');
+  const roundTableCols = document.getElementById('round-table-cols');
+  const roundTheadHTML = roundTableHead.innerHTML; // capture the round-view header markup
+  const roundColsHTML = roundTableCols.innerHTML; // capture the round-view column widths
+  const summaryTheadHTML = `
+    <tr class="border-b border-[var(--border)] text-[10px] sm:text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">
+      <th class="text-left px-3 sm:px-4 py-2.5 whitespace-nowrap">#</th>
+      <th class="text-left px-3 sm:px-4 py-2.5 whitespace-nowrap">Trường / Nhóm</th>
+      <th class="text-right px-3 sm:px-4 py-2.5 whitespace-nowrap">Vòng 1</th>
+      <th class="text-right px-3 sm:px-4 py-2.5 whitespace-nowrap">Vòng 2</th>
+      <th class="text-right px-3 sm:px-4 py-2.5 whitespace-nowrap">Vòng 3</th>
+      <th class="text-right px-3 sm:px-4 py-2.5 whitespace-nowrap">Tổng điểm</th>
+      <th class="text-right px-3 sm:px-4 py-2.5 whitespace-nowrap">Điểm TB</th>
+    </tr>`;
+  // # | Trường/Nhóm | Vòng1 | Vòng2 | Vòng3 | Tổng điểm | Điểm TB — sums to 100%
+  const summaryColsHTML = `
+    <col style="width:6%"><col style="width:30%"><col style="width:14%">
+    <col style="width:14%"><col style="width:14%"><col style="width:12%"><col style="width:10%">`;
+
+  const stepLabelEl = document.getElementById('step-label');
+  const stepPrevBtn = document.getElementById('step-prev-btn');
+  const stepNextBtn = document.getElementById('step-next-btn');
+  const stepNextLabel = document.getElementById('step-next-label');
+
+  const roundCache = {}; // keyed by sheet name, holds parsed rows for every step
+  let currentStep = 0;
+  let activeKey = STEPS[0].key;
+
+  function renderRoundTable(rows){
+    const sorted = [...rows].sort((a, b) => (a.stt ?? 0) - (b.stt ?? 0));
+    roundTableBody.innerHTML = sorted.map(r => `
+      <tr class="round-table-row row-hover">
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-display text-[var(--muted)]">${r.stt ?? '–'}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-semibold text-[var(--text)]">${escapeHtml(r.team)}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-center text-[var(--muted)]">${r.de ?? '—'}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-center">${metricChip(r.move)}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-center">${metricChip(r.step)}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-center">${metricChip(r.perception)}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-center">${metricChip(r.misplaced)}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-center font-display text-[var(--orange)]">${r.totalCost !== null ? fmtScore(r.totalCost) : '—'}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3">${levelBadge(r.level)}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-[var(--muted)]">${escapeHtml(r.note || '—')}</td>
+      </tr>
+    `).join('');
+  }
+
+  // Summary step: shows each round's score + total — deliberately no rank column.
+  function renderSummaryTable(rows){
+    const sorted = [...rows].sort((a, b) => (a.stt ?? 0) - (b.stt ?? 0));
+    roundTableBody.innerHTML = sorted.map(r => `
+      <tr class="round-table-row row-hover">
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-display text-[var(--muted)]">${r.stt ?? '–'}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 font-semibold text-[var(--text)]">${escapeHtml(r.team)}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-right">${r.v1 !== null ? fmtScore(r.v1) : '—'}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-right">${r.v2 !== null ? fmtScore(r.v2) : '—'}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-right">${r.v3 !== null ? fmtScore(r.v3) : '—'}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-right font-display text-[var(--orange)]">${r.total !== null ? fmtScore(r.total) : '—'}</td>
+        <td class="px-3 sm:px-4 py-2.5 sm:py-3 text-right">${r.avg !== null ? fmtScore(r.avg) : '—'}</td>
+      </tr>
+    `).join('');
+  }
+
+  function updateStepper(index){
+    document.querySelectorAll('.step-dot').forEach(dot => {
+      const i = Number(dot.dataset.dot);
+      dot.classList.toggle('is-active', i === index);
+      dot.classList.toggle('is-done', i < index);
+    });
+    document.querySelectorAll('.step-line').forEach(line => {
+      const i = Number(line.dataset.line);
+      line.classList.toggle('is-done', i < index);
+    });
+  }
+
+  // `silent`: used by the auto-poll below — refetches in the background without
+  // flashing the loading spinner, and only touches the DOM if the data actually
+  // changed (so a live-editing sheet doesn't make the table flicker every cycle).
+  async function loadStep(index, { force = false, silent = false } = {}){
+    currentStep = index;
+    const stepDef = STEPS[index];
+    activeKey = stepDef.key;
+
+    if(!silent){
+      stepLabelEl.textContent = stepDef.label;
+      updateStepper(index);
+      stepPrevBtn.disabled = index === 0;
+      const isLast = index === STEPS.length - 1;
+      stepNextBtn.classList.toggle('hidden', isLast);
+      proceedBtn.classList.toggle('hidden', !isLast);
+      if(!isLast) stepNextLabel.textContent = `Tới ${STEPS[index + 1].label}`;
+      roundTableHead.innerHTML = stepDef.type === 'summary' ? summaryTheadHTML : roundTheadHTML;
+      roundTableCols.innerHTML = stepDef.type === 'summary' ? summaryColsHTML : roundColsHTML;
+      roundTableBody.classList.add('hidden');
+      roundErrorEl.classList.add('hidden');
+    }
+
+    const render = (rows) => stepDef.type === 'summary' ? renderSummaryTable(rows) : renderRoundTable(rows);
+
+    if(!force && roundCache[stepDef.key]){
+      render(roundCache[stepDef.key]);
+      roundTableBody.classList.remove('hidden');
+      return;
+    }
+
+    if(!silent) roundLoadingEl.classList.remove('hidden');
+    try{
+      const json = await fetchSheetJSONP(stepDef.key);
+      const rows = stepDef.type === 'summary' ? parseSummarySheet(json) : parseRoundSheet(json);
+      if(activeKey !== stepDef.key) return; // user moved on while this was loading
+      const changed = JSON.stringify(rows) !== JSON.stringify(roundCache[stepDef.key]);
+      roundCache[stepDef.key] = rows;
+      if(!silent || changed){
+        render(rows);
+        roundTableBody.classList.remove('hidden');
+        roundErrorEl.classList.add('hidden');
+      }
+    } catch(err){
+      if(activeKey !== stepDef.key || silent) return; // don't surface transient poll failures
+      roundErrorEl.classList.remove('hidden');
+    } finally {
+      if(activeKey === stepDef.key && !silent) roundLoadingEl.classList.add('hidden');
+    }
+  }
+
+  stepPrevBtn.addEventListener('click', () => { if(currentStep > 0) loadStep(currentStep - 1); });
+  stepNextBtn.addEventListener('click', () => { if(currentStep < STEPS.length - 1) loadStep(currentStep + 1); });
+  roundRetryBtn.addEventListener('click', () => loadStep(currentStep, { force: true }));
+  roundRefreshBtn.addEventListener('click', () => loadStep(currentStep, { force: true }));
+
+  loadStep(0);
+
+  // Live-ish updates: as long as we're still on the scoreboard (haven't moved on
+  // to the reveal show), quietly re-poll the current step's sheet every few
+  // seconds so edits made in Google Sheets show up here without a manual refresh.
+  const POLL_MS = 8000;
+  setInterval(() => {
+    const scoreboardVisible = !document.getElementById('scoreboard-section').classList.contains('hidden');
+    if(scoreboardVisible && document.visibilityState === 'visible'){
+      loadStep(currentStep, { force: true, silent: true });
+    }
+  }, POLL_MS);
+
+  // Ranking is computed only here, on demand — never shown during the step flow.
+  async function ensureSummaryRanked(){
+    let rows = roundCache[SUMMARY_SHEET];
+    if(!rows){
+      const json = await fetchSheetJSONP(SUMMARY_SHEET);
+      rows = parseSummarySheet(json);
+      roundCache[SUMMARY_SHEET] = rows;
+    }
+    return rankTeams(rows);
+  }
+
+  function fillPodiumFromTeams(top3){
+    [1, 2, 3].forEach(rank => {
+      const team = top3[rank - 1];
+      const slot = slots[rank];
+      const nameEl = slot.querySelector('.team-name');
+      const subEl = slot.querySelector('.team-sub');
+      const scoreEl = slot.querySelector('.count-up');
+      if(team){
+        nameEl.textContent = team.team;
+        subEl.textContent = `${team.roundsGraded ?? 0}/3 vòng đã chấm`;
+        scoreEl.dataset.target = String(team.total ?? 0);
+        REVEAL_NAMES[rank] = team.team;
+      } else {
+        nameEl.textContent = 'Chưa có dữ liệu';
+        subEl.innerHTML = '&nbsp;';
+        scoreEl.dataset.target = '0';
+        REVEAL_NAMES[rank] = '';
+      }
+    });
+  }
+
+  proceedBtn.addEventListener('click', async () => {
+    proceedBtn.disabled = true;
+    const original = proceedBtnLabel.textContent;
+    proceedBtnLabel.textContent = 'ĐANG TẢI BẢNG TỔNG HỢP…';
+    proceedNote.textContent = '';
+    try{
+      const ranked = await ensureSummaryRanked();
+      const top3 = ranked.slice(0, 3);
+      const rest = ranked.slice(3);
+
+      fillPodiumFromTeams(top3);
+      DATA = rest.map((t, i) => ({
+        rank: i + 4,
+        name: t.team,
+        handle: `${t.roundsGraded ?? 0}/3 vòng đã chấm`,
+        score: t.total ?? 0,
+      }));
+      listHeading.textContent = rest.length ? `Hạng 4 — ${3 + rest.length}` : 'Hạng 4 trở xuống';
+
+      document.getElementById('scoreboard-section').classList.add('hidden');
+      document.getElementById('reveal-wrap').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: reduceMotion() ? 'auto' : 'smooth' });
+    } catch(err){
+      proceedNote.textContent = 'Không tải được bảng tổng hợp — kiểm tra kết nối rồi thử lại.';
+      proceedNote.classList.add('text-rose-600');
+    } finally {
+      proceedBtn.disabled = false;
+      proceedBtnLabel.textContent = original;
+    }
+  });
 
   /* ============ Reveal show sequence ============ */
   /* Rank 3, then rank 2 each pop up big in center-stage to announce name + score,
